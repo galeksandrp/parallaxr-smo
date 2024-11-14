@@ -11,6 +11,7 @@
 :: Changelog - Nexus Published
 :: ---------------------------
 
+:: v1.1		- Early logging, guidance ref pathname special characters and progression
 :: v1.0		- Initial Release
 
 :: Thanks and Credit
@@ -21,11 +22,12 @@
 :: amushrow for deconvolution
 :: BRC under non-commercial use license agreement
 :: torum for Image-viewer
-:: TheGuardianDovahkiin for testing and feedback
+:: TheGuardianDovahkiin and BennyDollaz for testing and feedback
 
 :: Variables and Temp Files
 ::-------------------------
 
+::StartDir	= The folder where the ParallaxR BAT is run from
 ::TempDir	= The temporary directory where files are copied to and processed
 ::fchoose	= The user selected folder for processing (used twice)
 ::ModName	= The main folder (name) of the mod to process
@@ -38,6 +40,7 @@
 ::-----------------------------------------------------------------------------------------------
 
 @echo off
+set StartDir="%CD%"
 cd tools
 taskkill /f /im powershell.exe >NUL 2>&1
 setlocal enabledelayedexpansion
@@ -51,17 +54,28 @@ start /min /low powershell.exe -ExecutionPolicy Bypass -File .\AntiSleep.ps1
 cls
 echo.
 echo ParallaxR session started at %time%
+echo ParallaxR session started at %time% >%StartDir%\logfile.txt
 
 echo.
-echo In the pop up window, find the mod to process inside your Mod Manager\Mods folder
+echo Progress throughout can be seen in the title of this window
+
+echo.
+echo A pop up window will appear, find the mod to process inside your Mod Manager\Mods folder
 echo Be sure to highlight the TEXTURES subfolder and then click OK to continue
 echo.
+echo WARNING: if the full path to your selected mod contains special characters such as 
+echo brackets and parenthesis then ParallaxR may exit without warning and fail. To remedy
+echo this, rather than rename folders which could cause other issues, simply copy the mod
+echo folder to a drive root (ie. D:\ or E:\) and point ParallaxR to it there to process
+echo.
+pause
 
 title Select Folder
 set "psCommand="(new-object -COM 'Shell.Application')^
 .BrowseForFolder(0,'IMPORTANT: Find the mod inside your Mod Manager\Mods folder. Be sure to highlight the TEXTURES subfolder and then click OK to continue',0,0).self.path""
 call :OpenFolderBox
 if "%fchoose%" == "" goto :Terminate
+echo Chosen input folder is %fchoose% >>%StartDir%\logfile.txt
 
 cd /d !fchoose! >NUL 2>&1
 cd ..
@@ -90,10 +104,14 @@ set /a cCount=0
 for /F "delims=" %%g in ('dir/s/b/a-d ".\*_n.dds"2^>nul') do (set /a nCount=nCount+1)
 for /F "delims=" %%g in ('dir/s/b/a-d ".\*_p.dds"2^>nul') do (set /a pCount=pCount+1)
 
+echo Normal count for selected mod is %nCount% >>%StartDir%\logfile.txt
+echo Parallax count for selected mod is %pCount% >>%StartDir%\logfile.txt
+
 if %pCount% LSS %nCount% goto GoParallaxR
 color 4F
 title Error
 echo ERROR - Your selected mod does not appear to need any parallax files creating
+echo ERROR - Your selected mod does not appear to need any parallax files creating >>%StartDir%\logfile.txt
 echo.
 echo ParallaxR will now exit
 echo.
@@ -109,7 +127,7 @@ exit
 
 :GoParallaxR
 echo Copying files
-robocopy .\ %ModDir% *.dds /MT:8 /S >NUL 2>&1
+robocopy .\ %ModDir% *.dds /MT:8 /S /LOG+:%StartDir%\logfile.txt >NUL 2>&1
 cd /d %TempDir%
 rename %ModName% ParallaxR-%ModName%
 
@@ -163,6 +181,7 @@ set "psCommand="(new-object -COM 'Shell.Application')^
 .BrowseForFolder(0,'Highlight the drive and folder where you want your ParallaxR ready mod to be stored',0,0).self.path""
 call :OpenFolderBox
 if "%fchoose%" == "" goto :Terminate
+echo Chosen output folder is %fchoose% >>%StartDir%\logfile.txt
 xcopy .\* !fchoose! /s /v >NUL 2>&1
 explorer !fchoose!
 cd /d %TempDir%
