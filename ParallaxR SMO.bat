@@ -11,6 +11,8 @@
 :: Changelog - Nexus Published
 :: ---------------------------
 
+:: v1.3		- Added choose parallax strength, bugfix changed Output approach
+:: v1.2		- Improved logging, implemented user Parallax Intensity selection
 :: v1.1		- Early logging, guidance ref pathname special characters and progression
 :: v1.0		- Initial Release
 
@@ -28,6 +30,7 @@
 ::-------------------------
 
 ::StartDir	= The folder where the ParallaxR BAT is run from
+::pIntensity	= The user selected parallax intensity choice
 ::TempDir	= The temporary directory where files are copied to and processed
 ::fchoose	= The user selected folder for processing (used twice)
 ::ModName	= The main folder (name) of the mod to process
@@ -47,8 +50,7 @@ setlocal enabledelayedexpansion
 imageviewer -f on title.jpg
 color 8F
 title ParallaxR
-mkdir ptemp
-cd ptemp
+cd Output
 set TempDir="%CD%"
 start /min /low powershell.exe -ExecutionPolicy Bypass -File .\AntiSleep.ps1
 cls
@@ -57,7 +59,17 @@ echo ParallaxR session started at %time%
 echo ParallaxR session started at %time% >%StartDir%\logfile.txt
 
 echo.
-echo Progress throughout can be seen in the title of this window
+echo Choose below your desired parallax strength (how pronounced the 3D effect is)
+echo.
+echo The LOW setting is the mod authors preference and gives an understated 3D effect
+echo MEDIUM delivers a great effect overall although expect occasional artifacts
+echo HIGH ensures a strong parallax effect although can sometimes look unrealistic
+echo.
+choice /c LMH /M "Choose (L)ow, (M)edium or (H)igh for your parallax strength "
+if %ErrorLevel%==3 set pIntensity=-78
+if %ErrorLevel%==2 set pIntensity=-83
+if %ErrorLevel%==1 set pIntensity=-88
+echo P-Int is %pIntensity% >>%StartDir%\logfile.txt
 
 echo.
 echo A pop up window will appear, find the mod to process inside your Mod Manager\Mods folder
@@ -161,9 +173,9 @@ for /r %%g in (*.png) do if exist "%%~dpng.tif" del "%%g" >NUL 2>&1 | del "%%~dp
 
 set /a cCount=nCount-pCount
 echo Creating %cCount% Parallax Height Maps
-for /r %%g in (*.png) do ..\NormalToHeight "%%g" "%%~dpng_p.png" -scale 100.00 -numPasses 32 -normalScale 1.00 -maxStepHeight 1 -mapping XrYfgZb -zrange full -edgeMode Wrap >NUL 2>&1 | title Writing Height Data :- %%~ng
+for /r %%g in (*.png) do ..\NormalToHeight "%%g" "%%~dpng_p.png" -scale 100.00 -numPasses 32 -normalScale 1.00 -maxStepHeight 1 -mapping XrYfgZb -zrange full -edgeMode Wrap >NUL 2>&1 | title Writing Height File :- %%~ng
 
-for /r %%g in (*_p.png) do ..\convert -brightness-contrast -25X-88 "%%g" "%%~dpng.png" >NUL 2>&1 | title Optimising :- %%~ng
+for /r %%g in (*_p.png) do ..\convert -brightness-contrast -25X%pIntensity% "%%g" "%%~dpng.png" | title Optimising :- %%~ng
 
 echo Preparing 1k DDS Parallax Height Maps
 ..\texconv -r:keep -pow2 -f BC4_UNORM -sepalpha -nologo -y -h 1024 *_p.png >NUL 2>&1
@@ -171,22 +183,8 @@ del *.png /s /q >NUL 2>&1
 
 ::------------------------------------
 
-title Select Folder
-
-echo.
-echo In the pop up window, highlight the folder where to put your ParallaxR Output
-
-set fchoose=
-set "psCommand="(new-object -COM 'Shell.Application')^
-.BrowseForFolder(0,'Highlight the drive and folder where you want your ParallaxR ready mod to be stored',0,0).self.path""
-call :OpenFolderBox
-if "%fchoose%" == "" goto :Terminate
-echo Chosen output folder is %fchoose% >>%StartDir%\logfile.txt
-xcopy .\* !fchoose! /s /v >NUL 2>&1
-explorer !fchoose!
 cd /d %TempDir%
-cd ..
-rd /s /q .\ptemp
+explorer %TempDir%
 
 ::------------------------------------
 
