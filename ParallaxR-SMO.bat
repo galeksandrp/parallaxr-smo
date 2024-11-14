@@ -47,6 +47,7 @@
 set StartDir="%CD%"
 cd tools
 set ToolsDir="%CD%"
+set ToolsDirPS=%CD%
 taskkill /f /im powershell.exe >NUL 2>&1
 setlocal enabledelayedexpansion
 imageviewer -f on title.jpg
@@ -80,12 +81,13 @@ echo brackets and parenthesis then ParallaxR may exit without warning and fail. 
 echo this, rather than rename folders which could cause other issues, simply copy the mod
 echo folder to a drive root (ie. D:\ or E:\) and point ParallaxR to it there to process
 echo.
-pause
+REM pause
 
 title Select Folder
 set "psCommand="(new-object -COM 'Shell.Application')^
 .BrowseForFolder(0,'IMPORTANT: Highlight the mod inside your Mod Manager\Mods folder and then click OK to continue',0,0).self.path""
-call :OpenFolderBox
+REM call :OpenFolderBox
+set /p "fchoose=Enter ID: "
 if "%fchoose%" == "" goto :Terminate
 echo Chosen input folder is %fchoose% >>%StartDir%\logfile.txt
 echo Chosen input folder is %fchoose%
@@ -170,7 +172,8 @@ for /f "delims=" %%d in ('dir /s /b /ad ^| sort /r') do rd "%%d" >NUL 2>&1
 
 echo Preparing %nCount% Normal Maps
 echo Preparing %nCount% Normal Maps >>%StartDir%\logfile.txt
-for /r %%g in (*_n.dds) do %ToolsDir%\convert "%%g" -alpha off -background rgba(0,0,0,0) -resize 2048x2048 "%%~dpng.png" >NUL 2>&1 | title Resizing Normal :- %%~ng
+for /r %%g in (*_n.dds) do echo %ToolsDir%\convert "%%g" -alpha off -background rgba(0,0,0,0) -resize 2048x2048 "%%~dpng.png" >>%StartDir%\logfile.txt | title Resizing Normal :- %%~ng
+powershell "(ls -Recurse -Filter '*_n.dds') | foreach { if ((Get-Job -State Running).Count -gt 14) { do { sleep 1 } until ((Get-Job -State Running).Count -le 16) } ; start-job -ArgumentList $_,\"$($_.Directory.FullName)\$($_.Basename).png\" -ScriptBlock { param($g,$bn) & \"$env:ToolsDirPS\convert\" $g.FullName -alpha off -background \"rgba(0,0,0,0)\" -resize 2048x2048 \"$bn\" } }"
 del *_n.dds /s /q >NUL 2>&1
 
 echo Preserving %pCount% Existing Parallax Maps
@@ -191,9 +194,13 @@ for /r %%g in (*.png) do if exist "%%~dpng.tif" del "%%g" >NUL 2>&1 | del "%%~dp
 set /a cCount=nCount-pCount
 echo Creating %cCount% Parallax Height Maps
 echo Creating %cCount% Parallax Height Maps >>%StartDir%\logfile.txt
-for /r %%g in (*.png) do %ToolsDir%\NormalToHeight "%%g" "%%~dpng_p.png" -scale 100.00 -numPasses 32 -normalScale 1.00 -maxStepHeight 1 -mapping XrYfgZb -zrange full -edgeMode Wrap >NUL 2>&1 | title Writing Height File :- %%~ng
+for /r %%g in (*.png) do echo %ToolsDir%\NormalToHeight "%%g" "%%~dpng_p.png" -scale 100.00 -numPasses 32 -normalScale 1.00 -maxStepHeight 1 -mapping XrYfgZb -zrange full -edgeMode Wrap >>%StartDir%\logfile.txt | title Writing Height File :- %%~ng
+powershell "(ls -Recurse -Filter '*.png') | foreach {do { sleep 1 } while ((Get-Job -State Running).Count -ge 14) ; start-job -ArgumentList $_,\"$($_.Directory.FullName)\$($_.Basename)_p.png\" -ScriptBlock { param($g,$bn) & \"$env:ToolsDirPS\NormalToHeight\" $g.FullName $bn -scale 100.00 -numPasses 32 -normalScale 1.00 -maxStepHeight 1 -mapping XrYfgZb -zrange full -edgeMode Wrap } }"
+pause
 
-for /r %%g in (*_p.png) do %ToolsDir%\convert -brightness-contrast -25X%pIntensity% "%%g" "%%~dpng.png" | title Optimising :- %%~ng
+for /r %%g in (*_p.png) do echo %ToolsDir%\convert -brightness-contrast -25X%pIntensity% "%%g" "%%~dpng.png" | title Optimising :- %%~ng
+REM powershell "(ls -Recurse -Filter '*_p.png') | foreach {do { sleep 1 } while ((Get-Job -State Running).Count -ge 16) ; start-job -ArgumentList $_,\"$($_.Directory.FullName)\$($_.Basename).png\" -ScriptBlock { param($g,$bn) \"$env:ToolsDirPS\convert\" -brightness-contrast -25X-88 $g.FullName $bn } }"
+pause
 
 echo Preparing 1k DDS Parallax Height Maps
 echo Preparing 1k DDS Parallax Height Maps >>%StartDir%\logfile.txt
